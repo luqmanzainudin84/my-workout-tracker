@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Heatmap Luqman</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/cal-heatmap/dist/cal-heatmap.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/cal-heatmap/dist/cal-heatmap.css">
+    
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; display: flex; flex-direction: column; align-items: center; padding-top: 50px; }
+        h2 { color: #58a6ff; }
+        #cal-heatmap { background: #161b22; padding: 20px; border-radius: 6px; border: 1px solid #30363d; }
+        .stats { margin-top: 20px; font-size: 14px; color: #8b949e; }
+    </style>
+</head>
+<body>
+
+    <h2>🔥 Workout Heatmap</h2>
+    <div id="cal-heatmap"></div>
+    
+    <div class="stats" id="stats">Memuatkan data...</div>
+
+    <script>
+        const cal = new CalHeatmap();
+        
+        // Ambil data dari data.json yang diupdate oleh Google Sheets
+        fetch('data.json')
+            .then(response => response.json())
+            .then(data => {
+                // Proses data: Tukar tarikh ke format timestamp dan kira kalori
+                const cleanData = data.map(d => ({
+                    date: new Date(d.Tarikh).getTime() / 1000,
+                    value: parseFloat(d.Kalori_Terbakar || 0)
+                }));
+
+                const totalCalories = data.reduce((sum, d) => sum + parseFloat(d.Kalori_Terbakar || 0), 0);
+                document.getElementById('stats').innerText = `Jumlah Workout: ${data.length} kali | Total Kalori: ${totalCalories.toFixed(0)} kcal`;
+
+                // Render Heatmap
+                cal.paint({
+                    data: { source: cleanData, x: 'date', y: 'value' },
+                    date: { start: new Date(new Date().getFullYear(), 0, 1) }, // Mula dari Jan tahun semasa
+                    range: 12,
+                    type: 'month',
+                    theme: 'dark',
+                    scale: {
+                        color: {
+                            range: ['#0e4429', '#006d32', '#26a641', '#39d353'], // Warna hijau GitHub
+                            type: 'linear',
+                            domain: [0, 500] // Warna gelap jika kalori > 500
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                document.getElementById('stats').innerText = "Tiada data ditemui. Sila isi Google Sheets anda dulu.";
+                console.error(err);
+            });
+    </script>
+</body>
+</html>

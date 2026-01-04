@@ -3,61 +3,121 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workout Heatmap Luqman</title>
+    <title>Workout App Luqman</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/cal-heatmap/dist/cal-heatmap.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/cal-heatmap/dist/cal-heatmap.css">
-    
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background-color: #0d1117; color: #c9d1d9; display: flex; flex-direction: column; align-items: center; padding-top: 50px; }
-        h2 { color: #58a6ff; }
-        #cal-heatmap { background: #161b22; padding: 20px; border-radius: 6px; border: 1px solid #30363d; }
-        .stats { margin-top: 20px; font-size: 14px; color: #8b949e; }
+        body { font-family: sans-serif; background-color: #0d1117; color: #c9d1d9; padding: 20px; }
+        .card { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 10px; max-width: 500px; margin: 20px auto; }
+        input, select, button { width: 100%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #30363d; background: #0d1117; color: white; box-sizing: border-box; }
+        button { background-color: #238636; color: white; font-weight: bold; cursor: pointer; border: none; }
+        button:hover { background-color: #2ea043; }
+        h2 { text-align: center; color: #58a6ff; }
+        #cal-heatmap { display: flex; justify-content: center; margin-top: 20px; }
+        .status-msg { text-align: center; font-size: 14px; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h2>🔥 Workout Heatmap</h2>
+    <h2>🏋️ My Workout Tracker</h2>
+
+    <div class="card">
+        <label>Jenis Senaman:</label>
+        <select id="workout">
+            <option value="Pushup">Pushup</option>
+            <option value="Skipping">Skipping</option>
+            <option value="Squat">Squat</option>
+            <option value="Plank">Plank</option>
+        </select>
+
+        <label>Durasi (Minit):</label>
+        <input type="number" id="duration" placeholder="Contoh: 15">
+
+        <label>Kalori (Anggaran):</label>
+        <input type="number" id="calories" placeholder="Contoh: 150">
+
+        <button onclick="submitData()">Simpan Workout</button>
+        <div id="status" class="status-msg"></div>
+    </div>
+
     <div id="cal-heatmap"></div>
-    
-    <div class="stats" id="stats">Memuatkan data...</div>
 
     <script>
+        // URL Web App Google yang anda berikan
+        const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwyYfkqK8jkSLXMdNBDDq95uIGT9D09_W4eoedZsuheElrVzPaLNhZQau36rjjwyp4H/exec";
+        const DATA_URL = "data.json"; // Path ke fail data anda di repo
+
+        async function submitData() {
+            const workout = document.getElementById('workout').value;
+            const duration = document.getElementById('duration').value;
+            const calories = document.getElementById('calories').value;
+            const status = document.getElementById('status');
+
+            if(!duration || !calories) {
+                alert("Sila isi semua info!");
+                return;
+            }
+
+            status.innerText = "⏳ Sedang menyimpan ke Google Sheets & GitHub...";
+            status.style.color = "#8b949e";
+
+            // Hantar data ke Google Apps Script menggunakan POST
+            const formData = new URLSearchParams();
+            formData.append('workout', workout);
+            formData.append('duration', duration);
+            formData.append('calories', calories);
+
+            try {
+                // Gunakan mode: 'no-cors' untuk Apps Script
+                await fetch(WEB_APP_URL, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    mode: 'no-cors'
+                });
+
+                status.innerText = "✅ Berjaya! Data telah direkodkan.";
+                status.style.color = "#39d353";
+                
+                // Refresh selepas 2 saat untuk lihat perubahan
+                setTimeout(() => location.reload(), 2000);
+
+            } catch (err) {
+                console.error(err);
+                status.innerText = "❌ Ralat semasa menyimpan data.";
+                status.style.color = "#f85149";
+            }
+        }
+
+        // FUNGSI UNTUK PAPAR HEATMAP
         const cal = new CalHeatmap();
-        
-        // Ambil data dari data.json yang diupdate oleh Google Sheets
-        fetch('data.json')
-            .then(response => response.json())
+        fetch(DATA_URL + '?t=' + new Date().getTime()) // Tambah timestamp untuk elak cache
+            .then(res => res.json())
             .then(data => {
-                // Proses data: Tukar tarikh ke format timestamp dan kira kalori
                 const cleanData = data.map(d => ({
                     date: new Date(d.Tarikh).getTime() / 1000,
                     value: parseFloat(d.Kalori_Terbakar || 0)
                 }));
 
-                const totalCalories = data.reduce((sum, d) => sum + parseFloat(d.Kalori_Terbakar || 0), 0);
-                document.getElementById('stats').innerText = `Jumlah Workout: ${data.length} kali | Total Kalori: ${totalCalories.toFixed(0)} kcal`;
-
-                // Render Heatmap
                 cal.paint({
                     data: { source: cleanData, x: 'date', y: 'value' },
-                    date: { start: new Date(new Date().getFullYear(), 0, 1) }, // Mula dari Jan tahun semasa
-                    range: 12,
-                    type: 'month',
+                    date: { start: new Date(new Date().getFullYear(), 0, 1) },
+                    range: 4, 
+                    type: 'month', 
                     theme: 'dark',
-                    scale: {
-                        color: {
-                            range: ['#0e4429', '#006d32', '#26a641', '#39d353'], // Warna hijau GitHub
-                            type: 'linear',
-                            domain: [0, 500] // Warna gelap jika kalori > 500
-                        }
+                    scale: { 
+                        color: { 
+                            range: ['#0e4429', '#39d353'], 
+                            type: 'linear', 
+                            domain: [0, 500] 
+                        } 
                     }
                 });
             })
-            .catch(err => {
-                document.getElementById('stats').innerText = "Tiada data ditemui. Sila isi Google Sheets anda dulu.";
-                console.error(err);
-            });
+            .catch(err => console.log("Menunggu data pertama..."));
     </script>
 </body>
 </html>
